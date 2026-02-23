@@ -74,6 +74,8 @@ public class Main {
 
         glfwMakeContextCurrent(window);
         GL.createCapabilities();
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
         glfwShowWindow(window);
     }
 
@@ -122,5 +124,6 @@ public class Main {
 
     public static void main(String[] args) {
         new Main().run();
+        Camera camera = new Camera(0.0f, 0.0f, 5.0f);
     }
 }
