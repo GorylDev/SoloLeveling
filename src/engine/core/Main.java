@@ -1,3 +1,6 @@
+package engine.core;
+
+import engine.graphics.Camera;
 import org.lwjgl.opengl.GL;
 
 import static java.sql.Types.NULL;

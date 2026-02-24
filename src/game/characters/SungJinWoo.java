@@ -1,4 +1,4 @@
-package characters;
+package game.characters;
 
 public class SungJinWoo {
         private String name;

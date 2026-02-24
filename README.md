@@ -42,11 +42,11 @@ To prevent that, the engine relies on a few specific design patterns:
 src/
 ├── engine/
 │   ├── core/         # The Heart: Window, GameLoop, Time, Logger
-│   ├── graphics/     # The Eyes: ShaderProgram, Texture, Renderer, Camera
+│   ├── graphics/     # The Eyes: ShaderProgram, Texture, Renderer, engine.graphics.Camera
 │   ├── ecs/          # The Skeleton: Registry, Entity, IComponent, ISystem
 │   └── physics/      # The Muscle: AABB Collision, GravitySystem, Raycaster
 └── game/
     ├── system/       # System Logic: Quests, LevelingManager, StatScaling
-    ├── characters/     # Prefabs: JinWoo, Shadows, GateBosses
+    ├── game.characters/     # Prefabs: JinWoo, Shadows, GateBosses
     └── main/
 ```
