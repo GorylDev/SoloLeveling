@@ -1,13 +1,19 @@
 package engine.core;
 
 import engine.graphics.Camera;
+import engine.graphics.Mesh;
+import engine.graphics.ShaderProgram;
+import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL;
 
-import static java.sql.Types.NULL;
+import static org.lwjgl.system.MemoryUtil.NULL;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 
 public class Main {
+    private static Matrix4f projectionMatrix;
+    private static Matrix4f viewMatrix;
+    private static Matrix4f modelMatrix;
     private long window;
     private float playerX = 0.0f;
     private float playerY = 0.0f;
@@ -43,7 +49,7 @@ public class Main {
                 String keyName = glfwGetKeyName(key, scancode);
 
                 switch (key) {
-                    case NULL:
+                    case GLFW_KEY_UNKNOWN:
                         keyName = "Unknown Key (code: " + key + ")";
                         break;
                     case GLFW_KEY_W:
@@ -87,16 +93,45 @@ public class Main {
 
         double lastTime = glfwGetTime();
 
+        Camera camera = new Camera(0.0f, 0.0f, 5.0f);
+
+        ShaderProgram shaderProgram = new ShaderProgram("shaders/vertex.glsl", "shaders/fragment.glsl");
+
+        shaderProgram.createUniform("projectionMatrix");
+        shaderProgram.createUniform("viewMatrix");
+        shaderProgram.createUniform("modelMatrix");
+
+        projectionMatrix = camera.getProjectionMatrix(800, 600);
+        viewMatrix = camera.getViewMatrix();
+
+        Mesh mesh = new Mesh(new float[]{
+                -0.5f, -0.5f, 0.0f,
+                0.5f, -0.5f, 0.0f,
+                0.0f, 0.5f, 0.0f
+        });
+
         while (!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
             double deltaTime = currentTime - lastTime;
             lastTime = currentTime;
 
+            glfwPollEvents();
             control_wsad(deltaTime);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            shaderProgram.bind();
+
+            Matrix4f currentModelMatrix = new Matrix4f().identity();
+            shaderProgram.setUniform("modelMatrix", currentModelMatrix);
+            shaderProgram.setUniform("viewMatrix", viewMatrix);
+            shaderProgram.setUniform("projectionMatrix", projectionMatrix);
+
+            mesh.render();
+            shaderProgram.unbind();
             glfwSwapBuffers(window);
-            glfwPollEvents();
         }
+        shaderProgram.cleanup();
+        mesh.cleanup();
     }
 
     private void control_wsad(double deltaTime) {
@@ -127,6 +162,5 @@ public class Main {
 
     public static void main(String[] args) {
         new Main().run();
-        Camera camera = new Camera(0.0f, 0.0f, 5.0f);
     }
 }
