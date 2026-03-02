@@ -3,6 +3,7 @@ package engine.graphics;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 
 import static org.lwjgl.opengl.GL30.*;
 
@@ -10,14 +11,14 @@ public class Mesh {
 
     private final int vaoId;
     private final int vboId;
+    private final int eboId;
     private final int vertexCount;
 
-    public Mesh(float[] positions) {
-        this.vertexCount = positions.length / 3;
+    public Mesh(float[] positions, int[] indices) {
+        this.vertexCount = indices.length;
 
         FloatBuffer posBuffer = MemoryUtil.memAllocFloat(positions.length);
-        posBuffer.put(positions);
-        posBuffer.flip();
+        posBuffer.put(positions).flip();
 
         vaoId = glGenVertexArrays();
         glBindVertexArray(vaoId);
@@ -28,10 +29,19 @@ public class Mesh {
 
         glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
         glEnableVertexAttribArray(0);
-        MemoryUtil.memFree(posBuffer);
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        IntBuffer indicesBuffer = MemoryUtil.memAllocInt(indices.length);
+        indicesBuffer.put(indices).flip();
+
+        eboId = glGenBuffers();
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, eboId);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indicesBuffer, GL_STATIC_DRAW);
+
+        MemoryUtil.memFree(posBuffer);
+        MemoryUtil.memFree(indicesBuffer);
+
         glBindVertexArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
     public int getVaoId() {
@@ -42,15 +52,16 @@ public class Mesh {
         return vertexCount;
     }
 
+    public void render() {
+        glBindVertexArray(vaoId);
+        glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
+
     public void cleanup() {
         glDeleteVertexArrays(vaoId);
         glDeleteBuffers(vboId);
-    }
-
-    public void render() {
-        glBindVertexArray(vaoId);
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount);
-        glBindVertexArray(0);
+        glDeleteBuffers(eboId);
     }
 
 }

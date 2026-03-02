@@ -104,11 +104,19 @@ public class Main {
         projectionMatrix = camera.getProjectionMatrix(800, 600);
         viewMatrix = camera.getViewMatrix();
 
-        Mesh mesh = new Mesh(new float[]{
-                -0.5f, -0.5f, 0.0f,
-                0.5f, -0.5f, 0.0f,
-                0.0f, 0.5f, 0.0f
-        });
+        float[] positions = new float[]{
+                -0.5f,  0.5f, 0.0f, // 0: top-left
+                -0.5f, -0.5f, 0.0f, // 1: bottom-left
+                0.5f, -0.5f, 0.0f, // 2: bottom-right
+                0.5f,  0.5f, 0.0f, // 3: top-right
+        };
+
+        int[] indices = new int[]{
+                0, 1, 3,
+                3, 1, 2
+        };
+
+        Mesh mesh = new Mesh(positions, indices);
 
         while (!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
@@ -116,12 +124,13 @@ public class Main {
             lastTime = currentTime;
 
             glfwPollEvents();
-            control_wsad(deltaTime);
+            control_wsad(deltaTime, camera);
+            glfwPollEvents();
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
             shaderProgram.bind();
 
             Matrix4f currentModelMatrix = new Matrix4f().identity();
+            viewMatrix = camera.getViewMatrix();
             shaderProgram.setUniform("modelMatrix", currentModelMatrix);
             shaderProgram.setUniform("viewMatrix", viewMatrix);
             shaderProgram.setUniform("projectionMatrix", projectionMatrix);
@@ -134,30 +143,27 @@ public class Main {
         mesh.cleanup();
     }
 
-    private void control_wsad(double deltaTime) {
+    private void control_wsad(double deltaTime, Camera camera) {
+        float moveAmount = (float) (playerSpeed * deltaTime);
+
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-            playerY += (float) (playerSpeed * deltaTime);
-            System.out.println("Move forward");
+            camera.movePosition(0, 0, -moveAmount); //Move forward
         }
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-            playerY -= (float) (playerSpeed * deltaTime);
-            System.out.println("Move backward");
+            camera.movePosition(0, 0, moveAmount);  //Move backward
         }
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-            playerX -= (float) (playerSpeed * deltaTime);
-            System.out.println("Move left");
+            camera.movePosition(-moveAmount, 0, 0); //Strafe left
         }
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-            playerX += (float) (playerSpeed * deltaTime);
-            System.out.println("Move right");
+            camera.movePosition(moveAmount, 0, 0);  //Strafe righ
         }
         if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            for (playerZ = 0.0f; playerZ < 5.0f; playerZ += (float) (playerSpeed * deltaTime)) {
-                System.out.println("Jumping... Z=" + playerZ);
-            }
-            playerZ = 0.0f;
+            camera.movePosition(0, moveAmount, 0);  //Fly up
         }
-
+        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+            camera.movePosition(0, -moveAmount, 0); //Fly down
+        }
     }
 
     public static void main(String[] args) {

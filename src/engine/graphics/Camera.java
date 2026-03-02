@@ -19,6 +19,12 @@ public class Camera{
         this.projectionMatrix = new Matrix4f();
     }
 
+    public void movePosition(float offsetX, float offsetY, float offsetZ) {
+        position.x += offsetX;
+        position.y += offsetY;
+        position.z += offsetZ;
+    }
+
     public Matrix4f getViewMatrix(){
 
         Vector3f direction = new Vector3f(
