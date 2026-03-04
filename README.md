@@ -39,13 +39,23 @@ To prevent that, the engine relies on a few specific design patterns:
 ## 📂 Engine Directory Structure
 
 ```text
-src/
-├── engine/
-│   ├── core/         # The Heart: Window, GameLoop, Time, Logger
-│   ├── graphics/     # The Eyes: ShaderProgram, Texture, Renderer, engine.graphics.Camera
-└── game/
-    ├── system/       # System Logic: Quests, LevelingManager, StatScaling
-    ├── game.characters/     # Prefabs: JinWoo, Shadows, GateBosses
+SoloLeveling/
+├── lib/                    # External LWJGL3 & JOML dependencies
+├── resources/              # Non-compiled assets (VRAM targets)
+│   ├── shaders/            
+│   │   ├── fragment.glsl   # GPU Pixel painting logic
+│   │   └── vertex.glsl     # GPU Geometry & UV mapping logic
+│   └── textures/           
+│       └── test.jpeg       # Current active test sprite
+└── src/                    # Main Source Code
+    ├── engine/             # The Custom Rendering Engine
+    │   ├── core/           
+    │   │   ├── Main.java       # Engine entry point & Main Game Loop
+    │   │   └── Transform.java  # Spatial Math: Position, Rotation, Scale matrices
+    │   └── graphics/       
+    │       ├── Camera.java         # 3D Viewport navigation & View Matrix
+    │       ├── Mesh.java           # VBO/VAO/EBO geometry & UV coordinate memory
+    │       ├── ShaderProgram.java  # GLSL Compilation & Uniform binding
+    │       └── Texture.java        # stb_image C-library integration
+    └── game.characters/    # Game-specific logic & prefabs
         └── SungJinWoo.java
-    └── main/
-```
