@@ -118,6 +118,8 @@ public class Main {
 
         Mesh mesh = new Mesh(positions, indices);
 
+        Transform quadTransform = new Transform();
+
         while (!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
             double deltaTime = currentTime - lastTime;
@@ -129,7 +131,13 @@ public class Main {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             shaderProgram.bind();
 
-            Matrix4f currentModelMatrix = new Matrix4f().identity();
+            Matrix4f currentModelMatrix = new Matrix4f();
+
+            quadTransform.getModelMatrix(currentModelMatrix);
+            quadTransform.rotation.y += (float) (60.0f * deltaTime);
+            quadTransform.rotation.x += (float) (60.0f * deltaTime);
+            quadTransform.rotation.z += (float) (60.0f * deltaTime);
+
             viewMatrix = camera.getViewMatrix();
             shaderProgram.setUniform("modelMatrix", currentModelMatrix);
             shaderProgram.setUniform("viewMatrix", viewMatrix);
