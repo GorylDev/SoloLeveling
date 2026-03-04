@@ -3,6 +3,7 @@ package engine.core;
 import engine.graphics.Camera;
 import engine.graphics.Mesh;
 import engine.graphics.ShaderProgram;
+import engine.graphics.Texture;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL;
 
@@ -111,14 +112,23 @@ public class Main {
                 0.5f,  0.5f, 0.0f, // 3: top-right
         };
 
+        float[] textCoords = new float[]{
+                0.0f, 1.0f, // 0: top-left
+                0.0f, 0.0f, // 1: bottom-left
+                1.0f, 0.0f, // 2: bottom-right
+                1.0f, 1.0f, // 3: top-right
+        };
+
         int[] indices = new int[]{
                 0, 1, 3,
                 3, 1, 2
         };
 
-        Mesh mesh = new Mesh(positions, indices);
+        Mesh mesh = new Mesh(positions, textCoords, indices);
 
         Transform quadTransform = new Transform();
+
+        Texture texture = new Texture("resources/textures/test.jpeg");
 
         while (!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
@@ -143,12 +153,14 @@ public class Main {
             shaderProgram.setUniform("viewMatrix", viewMatrix);
             shaderProgram.setUniform("projectionMatrix", projectionMatrix);
 
+            texture.bind();
             mesh.render();
             shaderProgram.unbind();
             glfwSwapBuffers(window);
         }
         shaderProgram.cleanup();
         mesh.cleanup();
+        texture.cleanup();
     }
 
     private void control_wsad(double deltaTime, Camera camera) {

@@ -1,15 +1,15 @@
-#version 330 core
+#version 330
 
-layout (location = 0) in vec3 position;
+layout (location=0) in vec3 position;
+layout (location=1) in vec2 textCoord;
 
-// UNIFORMS: Math matrices passed from Java
+out vec2 outTextCoord;
+
 uniform mat4 projectionMatrix;
 uniform mat4 viewMatrix;
-uniform mat4 modelMatrix; //move and rotate the specific 3D object
+uniform mat4 modelMatrix;
 
 void main() {
-    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-    vec4 positionRelativeToCamera = viewMatrix * worldPosition;
-
-    gl_Position = projectionMatrix * positionRelativeToCamera;
+    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+    outTextCoord = textCoord;
 }
