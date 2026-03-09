@@ -19,6 +19,10 @@ public class Camera{
         this.projectionMatrix = new Matrix4f();
     }
 
+    public void setPosition(float x, float y, float z){
+        this.position.set(x, y, z);
+    }
+
     public void movePosition(float offsetX, float offsetY, float offsetZ) {
         position.x += offsetX;
         position.y += offsetY;
@@ -65,10 +69,6 @@ public class Camera{
 
     public void setYaw(float yaw){
         this.yaw = yaw;
-    }
-
-    public void setPosition(float x, float y, float z){
-        this.position.set(x, y, z);
     }
 
     public void setRotation(float pitch, float yaw){

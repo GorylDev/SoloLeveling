@@ -1,10 +1,8 @@
 package engine.core;
 
-import engine.graphics.Camera;
-import engine.graphics.Mesh;
-import engine.graphics.ShaderProgram;
-import engine.graphics.Texture;
+import engine.graphics.*;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.lwjgl.opengl.GL;
 
 import static org.lwjgl.system.MemoryUtil.NULL;
@@ -12,14 +10,10 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 
 public class Main {
-    private static Matrix4f projectionMatrix;
-    private static Matrix4f viewMatrix;
-    private static Matrix4f modelMatrix;
     private long window;
     private float playerX = 0.0f;
     private float playerY = 0.0f;
     private float playerZ = 0.0f;
-    private float playerSpeed = 2.0f;
 
     public void run() {
         init();
@@ -34,7 +28,7 @@ public class Main {
             throw new IllegalStateException("Unable to initialize GLFW");
         }
 
-        window = glfwCreateWindow(800, 600, "Solo Leveling", NULL, NULL);
+        window = glfwCreateWindow(1280, 720, "Solo Leveling", NULL, NULL);
         if (window == NULL) {
             throw new RuntimeException("Failed to create the GLFW window");
         }
@@ -82,53 +76,35 @@ public class Main {
             }
         });
 
+
         glfwMakeContextCurrent(window);
         GL.createCapabilities();
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_DEPTH_TEST);
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glDepthFunc(GL_LESS);
         glfwShowWindow(window);
     }
 
     private void loop() {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-
         double lastTime = glfwGetTime();
 
-        Camera camera = new Camera(0.0f, 0.0f, 5.0f);
-
+        Camera camera = new Camera(0.0f, 0.0f, 30.0f);
         ShaderProgram shaderProgram = new ShaderProgram("shaders/vertex.glsl", "shaders/fragment.glsl");
 
         shaderProgram.createUniform("projectionMatrix");
         shaderProgram.createUniform("viewMatrix");
         shaderProgram.createUniform("modelMatrix");
+        shaderProgram.createUniform("textureOffset");
+        shaderProgram.createUniform("textureScale");
 
-        projectionMatrix = camera.getProjectionMatrix(800, 600);
-        viewMatrix = camera.getViewMatrix();
+        Matrix4f projectionMatrix = camera.getProjectionMatrix(1980, 1080);
+        Matrix4f viewMatrix;
 
-        float[] positions = new float[]{
-                -0.5f,  0.5f, 0.0f, // 0: top-left
-                -0.5f, -0.5f, 0.0f, // 1: bottom-left
-                0.5f, -0.5f, 0.0f, // 2: bottom-right
-                0.5f,  0.5f, 0.0f, // 3: top-right
-        };
-
-        float[] textCoords = new float[]{
-                0.0f, 1.0f, // 0: top-left
-                0.0f, 0.0f, // 1: bottom-left
-                1.0f, 0.0f, // 2: bottom-right
-                1.0f, 1.0f, // 3: top-right
-        };
-
-        int[] indices = new int[]{
-                0, 1, 3,
-                3, 1, 2
-        };
-
-        Mesh mesh = new Mesh(positions, textCoords, indices);
-
-        Transform quadTransform = new Transform();
-
-        Texture texture = new Texture("resources/textures/test.jpeg");
+        Mesh mesh = ModelLoader.loadModel("resources/textures/sung-jin-woo.obj");
+        GameObject player = new GameObject(mesh, new Texture("resources/textures/SungJin-Woo.png"));
 
         while (!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
@@ -136,57 +112,77 @@ public class Main {
             lastTime = currentTime;
 
             glfwPollEvents();
-            control_wsad(deltaTime, camera);
+            control_wsad(deltaTime, player);
             glfwPollEvents();
+            player.getTransform().rotation.y += (float) (60.0f * deltaTime); //Rotate player over time
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             shaderProgram.bind();
 
             Matrix4f currentModelMatrix = new Matrix4f();
-
-            quadTransform.getModelMatrix(currentModelMatrix);
-            quadTransform.rotation.y += (float) (60.0f * deltaTime);
-            quadTransform.rotation.x += (float) (60.0f * deltaTime);
-            quadTransform.rotation.z += (float) (60.0f * deltaTime);
-
             viewMatrix = camera.getViewMatrix();
-            shaderProgram.setUniform("modelMatrix", currentModelMatrix);
             shaderProgram.setUniform("viewMatrix", viewMatrix);
             shaderProgram.setUniform("projectionMatrix", projectionMatrix);
 
-            texture.bind();
-            mesh.render();
+            player.getTransform().scale.set(4.0f, 4.0f, 4.0f);
+            player.render(shaderProgram, currentModelMatrix);
+
             shaderProgram.unbind();
             glfwSwapBuffers(window);
         }
         shaderProgram.cleanup();
         mesh.cleanup();
-        texture.cleanup();
     }
 
-    private void control_wsad(double deltaTime, Camera camera) {
+    private void control_wsad(double deltaTime, GameObject player) {
+        float playerSpeed = 4.0f;
         float moveAmount = (float) (playerSpeed * deltaTime);
+        Vector3f pos = player.getTransform().position;
 
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-            camera.movePosition(0, 0, -moveAmount); //Move forward
+            pos.y += moveAmount;//Move forward
         }
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-            camera.movePosition(0, 0, moveAmount);  //Move backward
+            pos.y -= moveAmount;//Move backward
         }
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-            camera.movePosition(-moveAmount, 0, 0); //Strafe left
+            pos.x -= moveAmount;//Strafe left
         }
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-            camera.movePosition(moveAmount, 0, 0);  //Strafe righ
+            pos.x += moveAmount;//Strafe righ
         }
         if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            camera.movePosition(0, moveAmount, 0);  //Fly up
+            pos.z += moveAmount;//Fly up
         }
         if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-            camera.movePosition(0, -moveAmount, 0); //Fly down
+            pos.z -= moveAmount;//Fly down
         }
     }
 
     public static void main(String[] args) {
         new Main().run();
+    }
+
+    public float getPlayerX() {
+        return playerX;
+    }
+
+    public void setPlayerX(float playerX) {
+        this.playerX = playerX;
+    }
+
+    public float getPlayerY() {
+        return playerY;
+    }
+
+    public void setPlayerY(float playerY) {
+        this.playerY = playerY;
+    }
+
+    public float getPlayerZ() {
+        return playerZ;
+    }
+
+    public void setPlayerZ(float playerZ) {
+        this.playerZ = playerZ;
     }
 }

@@ -15,7 +15,7 @@ public class Mesh {
     private final int eboId;
     private final int vertexCount;
 
-    public Mesh(float[] positions, float[] textCoords, int[] indices){
+    public Mesh(float[] positions, float[] normals, float[] textCoords, int[] indices){
         this.vboIdTextCoords = textCoords.length;
         this.vertexCount = indices.length;
 
@@ -32,12 +32,14 @@ public class Mesh {
         glVertexAttribPointer(0, 3, GL_FLOAT, false, 0, 0);
         glEnableVertexAttribArray(0);
 
-        IntBuffer indicesBuffer = MemoryUtil.memAllocInt(indices.length);
-        indicesBuffer.put(indices).flip();
-
+        FloatBuffer normalsBuffer = MemoryUtil.memAllocFloat(normals.length);
+        normalsBuffer.put(normals).flip();
 
         FloatBuffer textCoordsBuffer = MemoryUtil.memAllocFloat(textCoords.length);
         textCoordsBuffer.put(textCoords).flip();
+
+        IntBuffer indicesBuffer = MemoryUtil.memAllocInt(indices.length);
+        indicesBuffer.put(indices).flip();
 
         vboIdTextCoords = glGenBuffers();
         glBindBuffer(GL_ARRAY_BUFFER, vboIdTextCoords);
