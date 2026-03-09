@@ -5,8 +5,8 @@ import org.joml.Vector3f;
 
 public class Camera{
     private final Vector3f position;
-    private float pitch;
-    private float yaw;
+    private float pitch = 20.0f;
+    private float yaw = 0.0f;
 
     private final Matrix4f projectionMatrix;
 
@@ -29,20 +29,13 @@ public class Camera{
         position.z += offsetZ;
     }
 
-    public Matrix4f getViewMatrix(){
-
-        Vector3f direction = new Vector3f(
-                 (float) Math.cos(Math.toRadians(pitch)) * (float) Math.sin(Math.toRadians(yaw)),
-                 (float) Math.sin(Math.toRadians(pitch)),
-                 -(float) Math.cos(Math.toRadians(pitch)) * (float) Math.cos(Math.toRadians(yaw))
-        );
-
-        Vector3f target = new Vector3f(position).add(direction);
-
+    public Matrix4f getViewMatrix(Vector3f playerPosition){
         Vector3f up = new Vector3f(0f, 1f, 0f);
+        float targetHeightOffset = 2.5f;
+        Vector3f target = new Vector3f(playerPosition.x, playerPosition.y + targetHeightOffset, playerPosition.z);
 
         Matrix4f view = new Matrix4f();
-        view.lookAt(position, target, up);
+        view.lookAt(this.position, target, up);
         return view;
     }
 
@@ -57,6 +50,22 @@ public class Camera{
         pitch = Math.min(Math.max(pitch, -89.0f), 89.0f);
         yaw += dyaw;
         yaw %= 360.0f;
+    }
+
+    public void updateOrbit(Vector3f playerPosition) {
+        float pitchRad = (float) Math.toRadians(pitch);
+        float yawRad = (float) Math.toRadians(yaw);
+
+        float distanceFromPlayer = 10.0f;
+        float horizontalDistance = (float) (distanceFromPlayer * Math.cos(pitchRad));
+        float verticalDistance = (float) (distanceFromPlayer * Math.sin(pitchRad));
+
+        float offsetX = (float) (horizontalDistance * Math.sin(yawRad));
+        float offsetZ = (float) (horizontalDistance * Math.cos(yawRad));
+
+        this.position.x = playerPosition.x - offsetX;
+        this.position.y = playerPosition.y + verticalDistance;
+        this.position.z = playerPosition.z - offsetZ;
     }
 
     public void move(float dx, float dy, float dz){

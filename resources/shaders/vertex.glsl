@@ -11,12 +11,9 @@ uniform mat4 projectionMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 
-uniform vec2 textureOffset;
-uniform vec2 textureScale;
-
 void main() {
     gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
-    outTextCoord = (textCoord * textureScale) + textureOffset;
+    outTextCoord = textCoord;
 
     fragNormal = mat3(modelMatrix) * normal;
 }
