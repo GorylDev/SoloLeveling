@@ -10,14 +10,14 @@ public class GameObject {
     private final Transform transform;
     private final Texture texture;
 
-    public Transform getTransform() {
-        return transform;
-    }
-
     public GameObject(Mesh mesh, Texture texture){
         this.mesh = mesh;
         this.texture = texture;
         this.transform = new Transform();
+    }
+
+    public Transform getTransform() {
+        return transform;
     }
 
     public void render(ShaderProgram shader, Matrix4f currentModelMatrix){

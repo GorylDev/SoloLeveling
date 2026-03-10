@@ -5,6 +5,8 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL;
 
+import java.util.List;
+
 import static org.lwjgl.system.MemoryUtil.NULL;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -12,6 +14,7 @@ import static org.lwjgl.opengl.GL11.*;
 public class Main {
     private long window;
     private Camera camera;
+    private ChunkManager chunkManager;
     private float playerVelocityY = 0.0f;
     private boolean isGrounded = true;
     private float playerX = 0.0f;
@@ -62,7 +65,7 @@ public class Main {
                 mouseFirstMoved = true;
             }
 
-            double deltaX = xpos - lastMouseX;
+            double deltaX = lastMouseX - xpos;
             double deltaY = ypos - lastMouseY;
 
             lastMouseX = xpos;
@@ -93,18 +96,34 @@ public class Main {
         double lastTime = glfwGetTime();
 
         ShaderProgram shaderProgram = new ShaderProgram("shaders/vertex.glsl", "shaders/fragment.glsl");
+        ShaderProgram animShaderProgram = new ShaderProgram("shaders/anim_vertex.glsl", "shaders/anim_fragment.glsl");
+        ShaderProgram skyboxShader = new ShaderProgram("shaders/skybox_vertex.glsl", "shaders/skybox_fragment.glsl");
 
         shaderProgram.createUniform("projectionMatrix");
         shaderProgram.createUniform("viewMatrix");
         shaderProgram.createUniform("modelMatrix");
 
+        animShaderProgram.createUniform("projectionMatrix");
+        animShaderProgram.createUniform("viewMatrix");
+        animShaderProgram.createUniform("modelMatrix");
+
+        for (int i = 0; i < 150; i++) {
+            animShaderProgram.createUniform("boneMatrices[" + i + "]");
+        }
+
+        skyboxShader.createUniform("projectionMatrix");
+        skyboxShader.createUniform("viewMatrix");
+
         Matrix4f projectionMatrix = camera.getProjectionMatrix(1980, 1080);
-        Matrix4f viewMatrix;
 
-        Mesh mesh = ModelLoader.loadModel("resources/textures/sung-jin-woo.obj");
-        GameObject player = new GameObject(mesh, new Texture("resources/textures/SungJin-Woo.png"));
+        chunkManager = new ChunkManager();
+        Skybox skybox = new Skybox();
 
-        GameObject statua = new GameObject(mesh, new Texture("resources/textures/SungJin-Woo.png"));
+        AnimatedMesh mesh = AnimatedModelLoader.loadModel("resources/models/player_base.fbx");
+        AnimatedGameObject player = new AnimatedGameObject(mesh, new Texture("resources/textures/SungJin-Woo.png"));
+        player.getTransform().scale.set(0.015f, 0.015f, 0.015f);
+        Animation runAnimation = AnimationLoader.load("resources/models/anim_run.fbx", mesh.getBoneMap());
+        player.getAnimator().play(runAnimation);
 
         while (!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
@@ -113,30 +132,52 @@ public class Main {
 
             glfwPollEvents();
             control_wsad(deltaTime, player, camera);
+            player.update(deltaTime);
             camera.updateOrbit(player.getTransform().position);
-            glfwPollEvents();
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            shaderProgram.bind();
 
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            glDepthFunc(GL_LEQUAL);
+            skyboxShader.bind();
+            skyboxShader.setUniform("projectionMatrix", projectionMatrix);
+            Matrix4f skyViewMatrix = new Matrix4f(camera.getViewMatrix(player.getTransform().position));
+            skyViewMatrix.m30(0);
+            skyViewMatrix.m31(0);
+            skyViewMatrix.m32(0);
+            skyboxShader.setUniform("viewMatrix", skyViewMatrix);
+            skybox.getMesh().render();
+            skyboxShader.unbind();
+            glDepthFunc(GL_LESS);
+
+            animShaderProgram.bind();
             Matrix4f currentModelMatrix = new Matrix4f();
-            viewMatrix = camera.getViewMatrix(player.getTransform().position);
+            Matrix4f viewMatrix = camera.getViewMatrix(player.getTransform().position);
+            animShaderProgram.setUniform("viewMatrix", viewMatrix);
+            animShaderProgram.setUniform("projectionMatrix", projectionMatrix);
+
+            player.render(animShaderProgram, currentModelMatrix);
+            animShaderProgram.unbind();
+
+            shaderProgram.bind();
             shaderProgram.setUniform("viewMatrix", viewMatrix);
             shaderProgram.setUniform("projectionMatrix", projectionMatrix);
 
-            player.getTransform().scale.set(2.0f, 2.0f, 2.0f);
-            player.render(shaderProgram, currentModelMatrix);
-            statua.getTransform().position.set(5.0f, 0.0f, 0.0f);
-            statua.getTransform().scale.set(4.0f, 4.0f, 4.0f);
-            statua.render(shaderProgram, currentModelMatrix);
-
+            List<GameObject> visibleChunks = chunkManager.update(player.getTransform().position.x, player.getTransform().position.z);
+            for (GameObject chunk : visibleChunks) {
+                chunk.render(shaderProgram, currentModelMatrix);
+            }
             shaderProgram.unbind();
+
             glfwSwapBuffers(window);
         }
+
         shaderProgram.cleanup();
+        skyboxShader.cleanup();
         mesh.cleanup();
+        chunkManager.cleanup();
     }
 
-    private void control_wsad(double deltaTime, GameObject player, Camera camera) {
+    private void control_wsad(double deltaTime, AnimatedGameObject player, Camera camera) {
         float playerSpeed = 4.0f;
         float moveAmount = (float) (playerSpeed * deltaTime);
         Vector3f pos = player.getTransform().position;
@@ -178,12 +219,13 @@ public class Main {
         //Physics and gravity
         float gravity = -20.0f;
         float jumpPower = 8.0f;
+        float terrainHeight = TerrainGenerator.getProceduralHeight(pos.x, pos.z);
 
         playerVelocityY += gravity * (float) deltaTime;
         pos.y += playerVelocityY * (float) deltaTime;
 
-        if (pos.y <= 0.0f) {
-            pos.y = 0.0f;
+        if (pos.y <= terrainHeight) {
+            pos.y = terrainHeight;
             playerVelocityY = 0.0f;
             isGrounded = true;
         } else {
@@ -197,7 +239,7 @@ public class Main {
 
         if (isGrounded && (dx != 0 || dz != 0)) {
             float bobbingOffset = (float) (Math.sin(glfwGetTime() * 15.0) * 0.05);
-            pos.y = bobbingOffset;
+            pos.y = terrainHeight + bobbingOffset;
         }
     }
 
