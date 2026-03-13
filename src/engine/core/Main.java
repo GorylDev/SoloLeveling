@@ -119,11 +119,12 @@ public class Main {
         chunkManager = new ChunkManager();
         Skybox skybox = new Skybox();
 
-        AnimatedMesh mesh = AnimatedModelLoader.loadModel("resources/models/player_base.fbx");
-        AnimatedGameObject player = new AnimatedGameObject(mesh, new Texture("resources/textures/SungJin-Woo.png"));
-        player.getTransform().scale.set(0.015f, 0.015f, 0.015f);
-        Animation runAnimation = AnimationLoader.load("resources/models/anim_run.fbx", mesh.getBoneMap());
-        player.getAnimator().play(runAnimation);
+        AnimatedMesh baseMesh = AnimatedModelLoader.loadModel("resources/models/player_base.fbx");
+        AnimatedGameObject player = new AnimatedGameObject(baseMesh, new Texture("resources/textures/SungJin-Woo.png"));
+        player.getTransform().scale.set(0.01f, 0.01f, 0.01f);
+        Animation runAnimation = AnimationLoader.load("resources/models/anim_run.fbx", player.getMesh().getBoneMap());
+        Animation idleAnimation = AnimationLoader.load("resources/models/anim_idle.fbx", player.getMesh().getBoneMap());
+        player.getAnimator().play(idleAnimation);
 
         while (!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
@@ -131,7 +132,7 @@ public class Main {
             lastTime = currentTime;
 
             glfwPollEvents();
-            control_wsad(deltaTime, player, camera);
+            control_wsad(deltaTime, player, camera, idleAnimation, runAnimation);
             player.update(deltaTime);
             camera.updateOrbit(player.getTransform().position);
 
@@ -173,11 +174,11 @@ public class Main {
 
         shaderProgram.cleanup();
         skyboxShader.cleanup();
-        mesh.cleanup();
+        baseMesh.cleanup();
         chunkManager.cleanup();
     }
 
-    private void control_wsad(double deltaTime, AnimatedGameObject player, Camera camera) {
+    private void control_wsad(double deltaTime, AnimatedGameObject player, Camera camera, Animation idle, Animation run) {
         float playerSpeed = 4.0f;
         float moveAmount = (float) (playerSpeed * deltaTime);
         Vector3f pos = player.getTransform().position;
@@ -211,12 +212,13 @@ public class Main {
         pos.x += dx;
         pos.z += dz;
 
-        if (dx != 0 || dz != 0) {
+        boolean isMoving = (dx != 0 || dz != 0);
+
+        if (isMoving) {
             float angle = (float) Math.toDegrees(Math.atan2(dx, dz));
             player.getTransform().rotation.y = angle;
         }
 
-        //Physics and gravity
         float gravity = -20.0f;
         float jumpPower = 8.0f;
         float terrainHeight = TerrainGenerator.getProceduralHeight(pos.x, pos.z);
@@ -237,9 +239,15 @@ public class Main {
             isGrounded = false;
         }
 
-        if (isGrounded && (dx != 0 || dz != 0)) {
+        if (isGrounded && isMoving) {
             float bobbingOffset = (float) (Math.sin(glfwGetTime() * 15.0) * 0.05);
             pos.y = terrainHeight + bobbingOffset;
+        }
+
+        if (isMoving && player.getAnimator().getCurrentAnimation() != run) {
+            player.getAnimator().play(run);
+        } else if (!isMoving && player.getAnimator().getCurrentAnimation() != idle) {
+            player.getAnimator().play(idle);
         }
     }
 

@@ -20,6 +20,10 @@ public class Animator {
         }
     }
 
+    public Animation getCurrentAnimation() {
+        return currentAnimation;
+    }
+
     public Matrix4f[] getBoneTransforms() {
         if (currentAnimation == null || currentAnimation.getFrames().length == 0) {
             Matrix4f[] empty = new Matrix4f[150];
