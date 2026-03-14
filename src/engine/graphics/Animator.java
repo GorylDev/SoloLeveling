@@ -5,23 +5,28 @@ import org.joml.Matrix4f;
 public class Animator {
     private Animation currentAnimation;
     private double animationTime;
+    private double speedMultiplier = 1.0;
 
     public void play(Animation animation) {
         this.currentAnimation = animation;
         this.animationTime = 0.0;
     }
 
-    public void update(double deltaTime) {
-        if (currentAnimation == null) return;
-
-        animationTime += deltaTime;
-        if (animationTime >= currentAnimation.getDurationInSeconds()) {
-            animationTime %= currentAnimation.getDurationInSeconds();
-        }
+    public void setSpeedMultiplier(double speedMultiplier) {
+        this.speedMultiplier = speedMultiplier;
     }
 
     public Animation getCurrentAnimation() {
         return currentAnimation;
+    }
+
+    public void update(double deltaTime) {
+        if (currentAnimation == null) return;
+
+        animationTime += deltaTime * speedMultiplier;
+        if (animationTime >= currentAnimation.getDurationInSeconds()) {
+            animationTime %= currentAnimation.getDurationInSeconds();
+        }
     }
 
     public Matrix4f[] getBoneTransforms() {

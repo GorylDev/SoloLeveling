@@ -124,6 +124,7 @@ public class Main {
         player.getTransform().scale.set(0.01f, 0.01f, 0.01f);
         Animation runAnimation = AnimationLoader.load("resources/models/anim_run.fbx", player.getMesh().getBoneMap());
         Animation idleAnimation = AnimationLoader.load("resources/models/anim_idle.fbx", player.getMesh().getBoneMap());
+        Animation jumpAnimation = AnimationLoader.load("resources/models/anim_jump.fbx", player.getMesh().getBoneMap());
         player.getAnimator().play(idleAnimation);
 
         while (!glfwWindowShouldClose(window)) {
@@ -132,7 +133,7 @@ public class Main {
             lastTime = currentTime;
 
             glfwPollEvents();
-            control_wsad(deltaTime, player, camera, idleAnimation, runAnimation);
+            control_wsad(deltaTime, player, camera, idleAnimation, runAnimation, jumpAnimation);
             player.update(deltaTime);
             camera.updateOrbit(player.getTransform().position);
 
@@ -178,7 +179,7 @@ public class Main {
         chunkManager.cleanup();
     }
 
-    private void control_wsad(double deltaTime, AnimatedGameObject player, Camera camera, Animation idle, Animation run) {
+    private void control_wsad(double deltaTime, AnimatedGameObject player, Camera camera, Animation idle, Animation run, Animation jump) {
         float playerSpeed = 4.0f;
         float moveAmount = (float) (playerSpeed * deltaTime);
         Vector3f pos = player.getTransform().position;
@@ -219,14 +220,23 @@ public class Main {
             player.getTransform().rotation.y = angle;
         }
 
-        float gravity = -20.0f;
-        float jumpPower = 8.0f;
+        double jumpSpeedMultiplier = 2.0;
+        float jumpDuration = (float) (jump.getDurationInSeconds() / jumpSpeedMultiplier);
+        float maxJumpHeight = 2.0f;
+
+        float gravity = (-10.0f * maxJumpHeight) / (jumpDuration * jumpDuration);
+        float jumpPower = (4.0f * maxJumpHeight) / jumpDuration;
+
         float terrainHeight = TerrainGenerator.getProceduralHeight(pos.x, pos.z);
 
         playerVelocityY += gravity * (float) deltaTime;
         pos.y += playerVelocityY * (float) deltaTime;
 
         if (pos.y <= terrainHeight) {
+            pos.y = terrainHeight;
+            playerVelocityY = 0.0f;
+            isGrounded = true;
+        } else if (playerVelocityY <= 0.0f && pos.y - terrainHeight < 0.6f) {
             pos.y = terrainHeight;
             playerVelocityY = 0.0f;
             isGrounded = true;
@@ -239,14 +249,14 @@ public class Main {
             isGrounded = false;
         }
 
-        if (isGrounded && isMoving) {
-            float bobbingOffset = (float) (Math.sin(glfwGetTime() * 15.0) * 0.05);
-            pos.y = terrainHeight + bobbingOffset;
-        }
-
-        if (isMoving && player.getAnimator().getCurrentAnimation() != run) {
+        if (!isGrounded && player.getAnimator().getCurrentAnimation() != jump) {
+            player.getAnimator().setSpeedMultiplier(jumpSpeedMultiplier);
+            player.getAnimator().play(jump);
+        } else if (isGrounded && isMoving && player.getAnimator().getCurrentAnimation() != run) {
+            player.getAnimator().setSpeedMultiplier(1.0);
             player.getAnimator().play(run);
-        } else if (!isMoving && player.getAnimator().getCurrentAnimation() != idle) {
+        } else if (isGrounded && !isMoving && player.getAnimator().getCurrentAnimation() != idle) {
+            player.getAnimator().setSpeedMultiplier(1.0);
             player.getAnimator().play(idle);
         }
     }
