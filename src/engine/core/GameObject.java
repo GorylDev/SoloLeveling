@@ -20,10 +20,20 @@ public class GameObject {
         return transform;
     }
 
-    public void render(ShaderProgram shader, Matrix4f currentModelMatrix){
-        transform.getModelMatrix(currentModelMatrix);
-        shader.setUniform("modelMatrix", currentModelMatrix);
-        texture.bind();
+    public void render(ShaderProgram shader, Matrix4f modelMatrix) {
+        modelMatrix.identity()
+                .translate(transform.position)
+                .rotateX(transform.rotation.x)
+                .rotateY(transform.rotation.y)
+                .rotateZ(transform.rotation.z)
+                .scale(transform.scale);
+
+        shader.setUniform("modelMatrix", modelMatrix);
+
+        if (texture != null) {
+            texture.bind();
+        }
+
         mesh.render();
     }
 

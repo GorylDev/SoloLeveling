@@ -1,6 +1,7 @@
 package engine.graphics;
 
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.lwjgl.system.MemoryStack;
 
 import java.io.InputStream;
@@ -15,10 +16,10 @@ public class ShaderProgram {
     private final int programId;
     private final java.util.Map<String, Integer> uniforms = new HashMap<>();
 
-    public void createUniform(String uniformName){
+    public void createUniform(String uniformName) {
         int uniformLocation = glGetUniformLocation(programId, uniformName);
-        if(uniformLocation < 0){
-            throw new RuntimeException("Could not find uniform: " + uniformName);
+        if (uniformLocation < 0) {
+            System.out.println("GPU WARNING: " + uniformName + " does not exist in shader program " + programId);
         }
         uniforms.put(uniformName, uniformLocation);
     }
@@ -85,6 +86,18 @@ public class ShaderProgram {
         glDeleteShader(fragmentShaderId);
 
         this.programId = programId;
+    }
+
+    public void setUniform(String uniformName, int value) {
+        glUniform1i(uniforms.get(uniformName), value);
+    }
+
+    public void setUniform(String uniformName, float value) {
+        glUniform1f(uniforms.get(uniformName), value);
+    }
+
+    public void setUniform(String uniformName, Vector3f value) {
+        glUniform3f(uniforms.get(uniformName), value.x, value.y, value.z);
     }
 
     public void bind() {

@@ -10,6 +10,7 @@ import java.util.List;
 import static org.lwjgl.system.MemoryUtil.NULL;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL20.*;
 
 public class Main {
     private long window;
@@ -42,6 +43,7 @@ public class Main {
             throw new RuntimeException("Failed to create the GLFW window");
         }
 
+        //keycallback just in case
         glfwSetKeyCallback(window, (windowHandle, key, scancode, action, mods) -> {
             String userAction = switch (action) {
                 case GLFW_PRESS -> "pressed";
@@ -55,7 +57,6 @@ public class Main {
                 glfwSetWindowShouldClose(windowHandle, true);
                 System.out.println("System: Game closed on action: " + esc + " " + userAction);
             }
-
         });
 
         glfwSetCursorPosCallback(window, (windowHandle, xpos, ypos) -> {
@@ -76,7 +77,6 @@ public class Main {
             if (camera != null) {
                 camera.rotate((float) deltaY * sensitivity, (float) deltaX * sensitivity);
             }
-
         });
 
         glfwMakeContextCurrent(window);
@@ -90,18 +90,30 @@ public class Main {
         glfwShowWindow(window);
     }
 
+    //main loop
     private void loop() {
         camera = new Camera(0.0f, 0.0f, 15.0f);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         double lastTime = glfwGetTime();
 
+        //defining shaders
         ShaderProgram shaderProgram = new ShaderProgram("shaders/vertex.glsl", "shaders/fragment.glsl");
         ShaderProgram animShaderProgram = new ShaderProgram("shaders/anim_vertex.glsl", "shaders/anim_fragment.glsl");
         ShaderProgram skyboxShader = new ShaderProgram("shaders/skybox_vertex.glsl", "shaders/skybox_fragment.glsl");
+        ShaderProgram gateShader = new ShaderProgram("shaders/gate_vertex.glsl", "shaders/gate_fragment.glsl");
 
+        //creating shader uniforms
         shaderProgram.createUniform("projectionMatrix");
         shaderProgram.createUniform("viewMatrix");
         shaderProgram.createUniform("modelMatrix");
+        shaderProgram.createUniform("texture_sampler");
+        shaderProgram.createUniform("fogColor");
+
+        gateShader.createUniform("projectionMatrix");
+        gateShader.createUniform("viewMatrix");
+        gateShader.createUniform("modelMatrix");
+        gateShader.createUniform("time");
+        gateShader.createUniform("gateColor");
 
         animShaderProgram.createUniform("projectionMatrix");
         animShaderProgram.createUniform("viewMatrix");
@@ -119,6 +131,7 @@ public class Main {
         chunkManager = new ChunkManager();
         Skybox skybox = new Skybox();
 
+        //defining animations
         AnimatedMesh baseMesh = AnimatedModelLoader.loadModel("resources/models/player_base.fbx");
         AnimatedGameObject player = new AnimatedGameObject(baseMesh, new Texture("resources/textures/SungJin-Woo.png"));
         player.getTransform().scale.set(0.01f, 0.01f, 0.01f);
@@ -127,6 +140,17 @@ public class Main {
         Animation jumpAnimation = AnimationLoader.load("resources/models/anim_jump.fbx", player.getMesh().getBoneMap());
         player.getAnimator().play(idleAnimation);
 
+        //gate system initialization
+        Mesh gateMesh = PrimitiveFactory.createQuad();
+        float gateX = 0.0f;
+        float gateZ = -20.0f;
+        float gateY = TerrainGenerator.getProceduralHeight(gateX, gateZ) + 5.0f;
+        Gate dungeonGate = new Gate(new Vector3f(gateX, gateY, gateZ), gateMesh);
+        Gate exitGate = null;
+        boolean inDungeon = false;
+        Vector3f overworldReturnPos = new Vector3f();
+
+        //main while loop
         while (!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
             double deltaTime = currentTime - lastTime;
@@ -140,6 +164,7 @@ public class Main {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             glDepthFunc(GL_LEQUAL);
+            shaderProgram.bind();
             skyboxShader.bind();
             skyboxShader.setUniform("projectionMatrix", projectionMatrix);
             Matrix4f skyViewMatrix = new Matrix4f(camera.getViewMatrix(player.getTransform().position));
@@ -156,13 +181,19 @@ public class Main {
             Matrix4f viewMatrix = camera.getViewMatrix(player.getTransform().position);
             animShaderProgram.setUniform("viewMatrix", viewMatrix);
             animShaderProgram.setUniform("projectionMatrix", projectionMatrix);
-
             player.render(animShaderProgram, currentModelMatrix);
             animShaderProgram.unbind();
 
             shaderProgram.bind();
             shaderProgram.setUniform("viewMatrix", viewMatrix);
             shaderProgram.setUniform("projectionMatrix", projectionMatrix);
+            shaderProgram.setUniform("texture_sampler", 0);
+
+            if (inDungeon) {
+                shaderProgram.setUniform("fogColor", new Vector3f(0.1f, 0.0f, 0.0f));
+            } else {
+                shaderProgram.setUniform("fogColor", new Vector3f(0.5f, 0.5f, 0.5f));
+            }
 
             List<GameObject> visibleChunks = chunkManager.update(player.getTransform().position.x, player.getTransform().position.z);
             for (GameObject chunk : visibleChunks) {
@@ -170,15 +201,64 @@ public class Main {
             }
             shaderProgram.unbind();
 
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            gateShader.bind();
+            gateShader.setUniform("projectionMatrix", projectionMatrix);
+            gateShader.setUniform("viewMatrix", viewMatrix);
+            gateShader.setUniform("time", (float) glfwGetTime());
+
+            if (!inDungeon) {
+                gateShader.setUniform("gateColor", new Vector3f(0.0f, 0.5f, 1.0f));
+                dungeonGate.render(gateShader, currentModelMatrix);
+            } else if (exitGate != null) {
+                gateShader.setUniform("gateColor", new Vector3f(1.0f, 0.2f, 0.0f));
+                exitGate.render(gateShader, currentModelMatrix);
+            }
+
+            dungeonGate.render(gateShader, currentModelMatrix);
+            gateShader.unbind();
+
+            glDisable(GL_BLEND);
+
+            if (!inDungeon && dungeonGate.isPlayerEntering(player.getTransform().position)) {
+                System.out.println("SYSTEM: Teleporting to Dungeon Dimension...");
+                inDungeon = true;
+                overworldReturnPos.set(player.getTransform().position);
+
+                float dungeonX = 10000.0f;
+                float dungeonZ = 10000.0f;
+                float dungeonY = TerrainGenerator.getProceduralHeight(dungeonX, dungeonZ) + 5.0f;
+
+                playerVelocityY = 0.0f;
+                player.getTransform().position.set(dungeonX, dungeonY, dungeonZ);
+
+                float exitX = dungeonX;
+                float exitZ = dungeonZ - 20.0f;
+                float exitY = TerrainGenerator.getProceduralHeight(exitX, exitZ) + 5.0f;
+                exitGate = new Gate(new Vector3f(exitX, exitY, exitZ), gateMesh);
+
+            } else if (inDungeon && exitGate.isPlayerEntering(player.getTransform().position)) {
+                System.out.println("SYSTEM: Dungeon cleared. Returning to Overworld...");
+                inDungeon = false;
+
+                playerVelocityY = 0.0f;
+                player.getTransform().position.set(overworldReturnPos.x, overworldReturnPos.y + 1.0f, overworldReturnPos.z + 5.0f);
+            }
+
             glfwSwapBuffers(window);
         }
 
         shaderProgram.cleanup();
+        animShaderProgram.cleanup();
         skyboxShader.cleanup();
+        gateShader.cleanup();
         baseMesh.cleanup();
         chunkManager.cleanup();
     }
 
+    //MAIN CONTROLS
     private void control_wsad(double deltaTime, AnimatedGameObject player, Camera camera, Animation idle, Animation run, Animation jump) {
         float playerSpeed = 4.0f;
         float moveAmount = (float) (playerSpeed * deltaTime);
@@ -216,8 +296,7 @@ public class Main {
         boolean isMoving = (dx != 0 || dz != 0);
 
         if (isMoving) {
-            float angle = (float) Math.toDegrees(Math.atan2(dx, dz));
-            player.getTransform().rotation.y = angle;
+            player.getTransform().rotation.y = (float) Math.toDegrees(Math.atan2(dx, dz));
         }
 
         double jumpSpeedMultiplier = 2.0;
@@ -261,6 +340,7 @@ public class Main {
         }
     }
 
+    //run
     public static void main(String[] args) {
         new Main().run();
     }
@@ -268,23 +348,18 @@ public class Main {
     public float getPlayerX() {
         return playerX;
     }
-
     public void setPlayerX(float playerX) {
         this.playerX = playerX;
     }
-
     public float getPlayerY() {
         return playerY;
     }
-
     public void setPlayerY(float playerY) {
         this.playerY = playerY;
     }
-
     public float getPlayerZ() {
         return playerZ;
     }
-
     public void setPlayerZ(float playerZ) {
         this.playerZ = playerZ;
     }
