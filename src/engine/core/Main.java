@@ -149,6 +149,7 @@ public class Main {
         Gate exitGate = null;
         boolean inDungeon = false;
         Vector3f overworldReturnPos = new Vector3f();
+        EnemyManager enemyManager = new EnemyManager();
 
         //main while loop
         while (!glfwWindowShouldClose(window)) {
@@ -166,6 +167,7 @@ public class Main {
             glDepthFunc(GL_LEQUAL);
             shaderProgram.bind();
             skyboxShader.bind();
+            animShaderProgram.bind();
             skyboxShader.setUniform("projectionMatrix", projectionMatrix);
             Matrix4f skyViewMatrix = new Matrix4f(camera.getViewMatrix(player.getTransform().position));
             skyViewMatrix.m30(0);
@@ -182,6 +184,10 @@ public class Main {
             animShaderProgram.setUniform("viewMatrix", viewMatrix);
             animShaderProgram.setUniform("projectionMatrix", projectionMatrix);
             player.render(animShaderProgram, currentModelMatrix);
+
+            enemyManager.update(deltaTime, player.getTransform().position);
+            enemyManager.render(animShaderProgram, currentModelMatrix);
+
             animShaderProgram.unbind();
 
             shaderProgram.bind();
