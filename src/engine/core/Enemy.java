@@ -13,6 +13,9 @@ public class Enemy {
     private final float attackRange = 2.5f;
     private final float speed = 3.5f;
 
+    private int health = 100;
+    private boolean isDead = false;
+
     public Enemy(AnimatedGameObject entity, Animation idle, Animation run, Animation attack) {
         this.entity = entity;
         this.idle = idle;
@@ -22,6 +25,8 @@ public class Enemy {
     }
 
     public void update(double deltaTime, Vector3f playerPos) {
+        if (isDead) return;
+
         Vector3f pos = entity.getTransform().position;
         float dx = playerPos.x - pos.x;
         float dz = playerPos.z - pos.z;
@@ -64,6 +69,20 @@ public class Enemy {
         if (entity.getAnimator().getCurrentAnimation() != attack) {
             entity.getAnimator().play(attack);
         }
+    }
+
+    public void takeDamage(int damage) {
+        if (isDead) return;
+        health -= damage;
+        System.out.println("SYSTEM: Wróg otrzymał " + damage + " obrażeń. Pozostałe HP: " + health);
+        if (health <= 0) {
+            isDead = true;
+            System.out.println("SYSTEM: Wróg został zgładzony!");
+        }
+    }
+
+    public boolean isDead() {
+        return isDead;
     }
 
     public AnimatedGameObject getEntity() {

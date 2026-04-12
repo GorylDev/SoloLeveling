@@ -24,6 +24,7 @@ public class Main {
     private double lastMouseX = -1;
     private double lastMouseY = -1;
     private boolean mouseFirstMoved = false;
+    private boolean attackRequested = false;
 
     public void run() {
         init();
@@ -43,7 +44,6 @@ public class Main {
             throw new RuntimeException("Failed to create the GLFW window");
         }
 
-        //keycallback just in case
         glfwSetKeyCallback(window, (windowHandle, key, scancode, action, mods) -> {
             String userAction = switch (action) {
                 case GLFW_PRESS -> "pressed";
@@ -79,6 +79,12 @@ public class Main {
             }
         });
 
+        glfwSetMouseButtonCallback(window, (windowHandle, button, action, mods) -> {
+            if (button == GLFW_MOUSE_BUTTON_1 && action == GLFW_PRESS) {
+                attackRequested = true;
+            }
+        });
+
         glfwMakeContextCurrent(window);
         GL.createCapabilities();
         glEnable(GL_BLEND);
@@ -90,19 +96,16 @@ public class Main {
         glfwShowWindow(window);
     }
 
-    //main loop
     private void loop() {
         camera = new Camera(0.0f, 0.0f, 15.0f);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         double lastTime = glfwGetTime();
 
-        //defining shaders
         ShaderProgram shaderProgram = new ShaderProgram("shaders/vertex.glsl", "shaders/fragment.glsl");
         ShaderProgram animShaderProgram = new ShaderProgram("shaders/anim_vertex.glsl", "shaders/anim_fragment.glsl");
         ShaderProgram skyboxShader = new ShaderProgram("shaders/skybox_vertex.glsl", "shaders/skybox_fragment.glsl");
         ShaderProgram gateShader = new ShaderProgram("shaders/gate_vertex.glsl", "shaders/gate_fragment.glsl");
 
-        //creating shader uniforms
         shaderProgram.createUniform("projectionMatrix");
         shaderProgram.createUniform("viewMatrix");
         shaderProgram.createUniform("modelMatrix");
@@ -131,16 +134,28 @@ public class Main {
         chunkManager = new ChunkManager();
         Skybox skybox = new Skybox();
 
-        //defining animations
         AnimatedMesh baseMesh = AnimatedModelLoader.loadModel("resources/models/player_base.fbx");
-        AnimatedGameObject player = new AnimatedGameObject(baseMesh, new Texture("resources/textures/SungJin-Woo.png"));
+        Texture mainTexture = new Texture("resources/textures/SungJin-Woo.png");
+
+        AnimatedGameObject player = new AnimatedGameObject(baseMesh, mainTexture);
         player.getTransform().scale.set(0.01f, 0.01f, 0.01f);
+
         Animation runAnimation = AnimationLoader.load("resources/models/anim_run.fbx", player.getMesh().getBoneMap());
         Animation idleAnimation = AnimationLoader.load("resources/models/anim_idle.fbx", player.getMesh().getBoneMap());
         Animation jumpAnimation = AnimationLoader.load("resources/models/anim_jump.fbx", player.getMesh().getBoneMap());
+        Animation attackAnimation = AnimationLoader.load("resources/models/anim_attack.fbx", player.getMesh().getBoneMap());
+        double attackEndTime = 0.0;
+        double hitStopEndTime = 0.0;
+
         player.getAnimator().play(idleAnimation);
 
-        //gate system initialization
+        EnemyManager enemyManager = new EnemyManager();
+        AnimatedGameObject enemyEntity = new AnimatedGameObject(baseMesh, mainTexture);
+        enemyEntity.getTransform().scale.set(0.01f, 0.01f, 0.01f);
+        enemyEntity.getTransform().position.set(0.0f, 0.0f, -10.0f); // 10 metrów przed graczem
+        Enemy mob = new Enemy(enemyEntity, idleAnimation, runAnimation, attackAnimation);
+        enemyManager.spawnEnemy(mob);
+
         Mesh gateMesh = PrimitiveFactory.createQuad();
         float gateX = 0.0f;
         float gateZ = -20.0f;
@@ -149,25 +164,42 @@ public class Main {
         Gate exitGate = null;
         boolean inDungeon = false;
         Vector3f overworldReturnPos = new Vector3f();
-        EnemyManager enemyManager = new EnemyManager();
 
-        //main while loop
         while (!glfwWindowShouldClose(window)) {
             double currentTime = glfwGetTime();
             double deltaTime = currentTime - lastTime;
             lastTime = currentTime;
 
+            if (currentTime < hitStopEndTime) {
+                deltaTime = 0.0;
+            }
+
             glfwPollEvents();
-            control_wsad(deltaTime, player, camera, idleAnimation, runAnimation, jumpAnimation);
+
+            if (attackRequested && currentTime > attackEndTime) {
+                player.getAnimator().setSpeedMultiplier(1.5);
+                player.getAnimator().play(attackAnimation);
+
+                attackEndTime = currentTime + (attackAnimation.getDurationInSeconds() / 1.5);
+                boolean hit = enemyManager.processPlayerAttack(player.getTransform().position, player.getTransform().rotation.y, 2.0f, 2.5f, 35);
+
+                if (hit) {
+                    hitStopEndTime = currentTime + 0.08;
+                }
+            }
+            attackRequested = false;
+
+            if (currentTime >= attackEndTime) {
+                control_wsad(deltaTime, player, camera, idleAnimation, runAnimation, jumpAnimation);
+            }
+
             player.update(deltaTime);
             camera.updateOrbit(player.getTransform().position);
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             glDepthFunc(GL_LEQUAL);
-            shaderProgram.bind();
             skyboxShader.bind();
-            animShaderProgram.bind();
             skyboxShader.setUniform("projectionMatrix", projectionMatrix);
             Matrix4f skyViewMatrix = new Matrix4f(camera.getViewMatrix(player.getTransform().position));
             skyViewMatrix.m30(0);
@@ -183,8 +215,8 @@ public class Main {
             Matrix4f viewMatrix = camera.getViewMatrix(player.getTransform().position);
             animShaderProgram.setUniform("viewMatrix", viewMatrix);
             animShaderProgram.setUniform("projectionMatrix", projectionMatrix);
-            player.render(animShaderProgram, currentModelMatrix);
 
+            player.render(animShaderProgram, currentModelMatrix);
             enemyManager.update(deltaTime, player.getTransform().position);
             enemyManager.render(animShaderProgram, currentModelMatrix);
 
@@ -222,8 +254,6 @@ public class Main {
                 gateShader.setUniform("gateColor", new Vector3f(1.0f, 0.2f, 0.0f));
                 exitGate.render(gateShader, currentModelMatrix);
             }
-
-            dungeonGate.render(gateShader, currentModelMatrix);
             gateShader.unbind();
 
             glDisable(GL_BLEND);
@@ -245,7 +275,8 @@ public class Main {
                 float exitY = TerrainGenerator.getProceduralHeight(exitX, exitZ) + 5.0f;
                 exitGate = new Gate(new Vector3f(exitX, exitY, exitZ), gateMesh);
 
-            } else if (inDungeon && exitGate.isPlayerEntering(player.getTransform().position)) {
+                //ZABEZPIECZENIE PRZED NULLEM (exitGate != null)
+            } else if (inDungeon && exitGate != null && exitGate.isPlayerEntering(player.getTransform().position)) {
                 System.out.println("SYSTEM: Dungeon cleared. Returning to Overworld...");
                 inDungeon = false;
 
@@ -264,7 +295,6 @@ public class Main {
         chunkManager.cleanup();
     }
 
-    //MAIN CONTROLS
     private void control_wsad(double deltaTime, AnimatedGameObject player, Camera camera, Animation idle, Animation run, Animation jump) {
         float playerSpeed = 4.0f;
         float moveAmount = (float) (playerSpeed * deltaTime);
@@ -346,7 +376,6 @@ public class Main {
         }
     }
 
-    //run
     public static void main(String[] args) {
         new Main().run();
     }
