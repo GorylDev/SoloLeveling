@@ -12,6 +12,7 @@ public class Enemy {
     private final float agroRange = 15.0f;
     private final float attackRange = 2.5f;
     private final float speed = 3.5f;
+    private final int expReward = 60;
 
     private int health = 100;
     private boolean isDead = false;
@@ -87,5 +88,9 @@ public class Enemy {
 
     public AnimatedGameObject getEntity() {
         return entity;
+    }
+
+    public int getExpReward() {
+        return expReward;
     }
 }

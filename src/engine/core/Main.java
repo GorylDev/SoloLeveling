@@ -25,6 +25,7 @@ public class Main {
     private double lastMouseY = -1;
     private boolean mouseFirstMoved = false;
     private boolean attackRequested = false;
+    private final PlayerStats playerStats = new PlayerStats();
 
     public void run() {
         init();
@@ -35,6 +36,7 @@ public class Main {
     }
 
     private void init() {
+
         if (!glfwInit()) {
             throw new IllegalStateException("Unable to initialize GLFW");
         }
@@ -56,6 +58,10 @@ public class Main {
                 String esc = "Escape";
                 glfwSetWindowShouldClose(windowHandle, true);
                 System.out.println("System: Game closed on action: " + esc + " " + userAction);
+            }
+
+            if (key == GLFW_KEY_I && action == GLFW_PRESS) {
+                playerStats.getInventory().printInventory();
             }
         });
 
@@ -181,7 +187,7 @@ public class Main {
                 player.getAnimator().play(attackAnimation);
 
                 attackEndTime = currentTime + (attackAnimation.getDurationInSeconds() / 1.5);
-                boolean hit = enemyManager.processPlayerAttack(player.getTransform().position, player.getTransform().rotation.y, 2.0f, 2.5f, 35);
+                boolean hit = enemyManager.processPlayerAttack(player.getTransform().position, player.getTransform().rotation.y, 2.0f, 2.5f, playerStats.getAttackPower());
 
                 if (hit) {
                     hitStopEndTime = currentTime + 0.08;
@@ -218,6 +224,19 @@ public class Main {
 
             player.render(animShaderProgram, currentModelMatrix);
             enemyManager.update(deltaTime, player.getTransform().position);
+
+            int expGained = enemyManager.processDeathsAndGetExp(playerStats);
+            if (expGained > 0) {
+                playerStats.addExperience(expGained);
+
+                float spawnZ = player.getTransform().position.z - 15.0f;
+                float spawnY = TerrainGenerator.getProceduralHeight(0.0f, spawnZ);
+                AnimatedGameObject newEntity = new AnimatedGameObject(baseMesh, mainTexture);
+                newEntity.getTransform().scale.set(0.01f, 0.01f, 0.01f);
+                newEntity.getTransform().position.set(0.0f, spawnY, spawnZ);
+                enemyManager.spawnEnemy(new Enemy(newEntity, idleAnimation, runAnimation, attackAnimation));
+            }
+
             enemyManager.render(animShaderProgram, currentModelMatrix);
 
             animShaderProgram.unbind();

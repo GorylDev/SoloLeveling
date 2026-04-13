@@ -14,7 +14,6 @@ public class EnemyManager {
     }
 
     public void update(double deltaTime, Vector3f playerPos) {
-        enemies.removeIf(Enemy::isDead);
 
         for (Enemy enemy : enemies) {
             enemy.update(deltaTime, playerPos);
@@ -25,6 +24,26 @@ public class EnemyManager {
         for (Enemy enemy : enemies) {
             enemy.getEntity().render(shader, modelMatrix);
         }
+    }
+
+    public int processDeathsAndGetExp(PlayerStats player) {
+        int totalExp = 0;
+        java.util.Iterator<Enemy> iterator = enemies.iterator();
+
+        while (iterator.hasNext()) {
+            Enemy enemy = iterator.next();
+            if (enemy.isDead()) {
+                totalExp += enemy.getExpReward();
+
+                if (Math.random() < 0.4) {
+                    Item core = new Item("core_e", "Class 'E' core", "A core dropped by a defeated enemy. Can be used to upgrade your weapon.");
+                    player.getInventory().addItem(core);
+                }
+
+                iterator.remove();
+            }
+        }
+        return totalExp;
     }
 
     public boolean processPlayerAttack(Vector3f playerPos, float playerRotationY, float attackReach, float attackRadius, int damage) {
